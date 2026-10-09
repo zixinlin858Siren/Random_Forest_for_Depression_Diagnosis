@@ -1,0 +1,271 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+We use classification trees to analyze the EEG_128 data set.
+EEG_128 has 53 observations, 
+1 dependent variable(type) and 
+9 independent variables
+Add original data to environment
+```{r}
+EEG <- read.csv("EEG_128.csv")
+```
+
+
+Adjust non-numerical parameters to numerical parameters
+```{r}
+EEG$gender <- as.factor(EEG$gender)
+EEG$type <- as.factor(EEG$type)
+```
+
+Start building single trees, and remove the ones that are too perfect
+```{r}
+library(rpart)
+library(rpart.plot)
+singletree1 <- rpart(type ~ age + gender + education.years. + PHQ.9 + CTQ.SF + LES + SSRS + GAD.7 + PSQI,
+      data = EEG,
+      method = "class",
+      parms = list(split = "information"),
+      control = rpart.control(minsplit = 1))
+print(singletree1)
+rpart.plot(singletree1)
+```
+Check for its accuracy
+```{r}
+y_pred <- predict(singletree1, newdata = EEG, type = "class")
+
+accuracy <- mean(y_pred == EEG$type)
+print(accuracy)
+```
+
+We remove PHQ.9
+```{r}
+library(rpart)
+library(rpart.plot)
+singletree2 <- rpart(type ~ age + gender + education.years. + CTQ.SF + LES + SSRS + GAD.7 + PSQI,
+                    data = EEG,
+                    method = "class",
+                    parms = list(split = "information"),
+                    control = rpart.control(minsplit = 1))
+print(singletree2)
+rpart.plot(singletree2)
+```
+Check for its accuracy
+```{r}
+y_pred <- predict(singletree2, newdata = EEG, type = "class")
+
+accuracy <- mean(y_pred == EEG$type)
+print(accuracy)
+```
+
+
+
+Remove GAD.7 and PSQI
+```{r}
+library(rpart)
+library(rpart.plot)
+singletree_3 <- rpart(type ~ age + gender + education.years. + CTQ.SF + LES + SSRS,
+                    data = EEG,
+                    method = "class",
+                    parms = list(split = "information"),
+                    control = rpart.control(minsplit = 1))
+print(singletree_3)
+rpart.plot(singletree_3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+In order to properly evaluate the performance of a classification tree on these data, we estimate the test error rather than simply computing the training error. 
+
+We split the observations into a training set and a test set, build the tree using the training set, and evaluate its performance on the test data. 
+### Last version: 30 for training and 30 for test 
+```{r}
+library(caret)
+library(rsample)
+split <- initial_split(EEG, prop = (nrow(EEG) - 23) / nrow(EEG))
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+
+Use train data to create a tree
+```{r}
+library(rpart)
+library(rpart.plot)
+singletree2 <- rpart(type ~ age + gender + education.years. + CTQ.SF + LES + SSRS + GAD.7 + PSQI,
+                    data = train_data,
+                      method = "class",
+                      parms = list(split = "information"))
+print(singletree2)
+rpart.plot(singletree2)
+```
+Use test data to predict and check the accuracy
+```{r}
+pred <- predict(TrainingTree3, test_data, type = "class")
+accuracy <- mean(pred == test_data$type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+```{r}
+Single_Tree <- rpart(type ~ age + gender + education.years. + CTQ.SF + LES + SSRS + GAD.7 + PSQI,
+                      data = train_data,
+                      method = "class",
+                      parms = list(split = "information"))
+print(Single_Tree)
+```
+Use test data to predict and check the accuracy
+```{r}
+pred <- predict(Single_Tree, test_data, type = "class")
+accuracy <- mean(pred == test_data$type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+
+
+```{r}
+TrainingTree1 <- rpart(type ~ age + gender + education.years. + PHQ.9 + CTQ.SF + LES + SSRS + GAD.7 + PSQI,
+                      data = train_data,
+                      method = "class",
+                      parms = list(split = "information"),
+                      control = rpart.control(minsplit = 1, cp = 0.001))
+print(TrainingTree1)
+rpart.plot(TrainingTree1)
+```
+Use test data to predict and check the accuracy
+```{r}
+pred <- predict(TrainingTree1, test_data, type = "class")
+accuracy <- mean(pred == test_data$type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+
+
+
+
+
+
+
+
+
+
+
+Pruning:
+Next, we consider whether pruning the tree might lead to improved classification performance. 
+We first split the data into a training and test set.
+We can use the split before.
+We use cross-validation to prune the tree on the training set, 
+and then evaluate the performance of the pruned tree on the test set.
+
+Use the previous splitted data before
+Train the decision tree(tree2)
+```{r}
+library(rpart)    # Decision Tree Model
+library(caret)    # Accuracy (confusionMatrix)
+clf <- rpart(type ~ age + gender + education.years. + CTQ.SF + LES + SSRS + PSQI,
+             data = train_data, 
+             parms = list(split = "information"),
+             control = rpart.control(minsplit = 1))
+print(clf)
+rpart.plot(clf)
+```
+Test unpruned tree's accuracy
+```{r}
+pred <- predict(clf, test_data, type = "class")
+accuracy <- mean(pred == test_data$type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+
+Next we use the cost_complexity_pruning_path() method of clf to extract cost-complexity values
+cost_complexity_pruning_path() is the method in Python,
+here in R we use printcp
+```{r}
+printcp(clf)
+```
+xerror can be used to select the best pruning point.
+We select the CP with the least xerror
+
+Prune the tree
+```{r}
+pruned_clf1 <- prune(clf, cp <- 0.045455)
+print(pruned_clf1)
+rpart.plot(pruned_clf1)
+```
+
+
+
+
+
+
+
+
+
+
+Use test data to predict and check the accuracy
+```{r}
+prune_pred <- predict(pruned_clf1, test_data, type = "class")
+accuracy <- mean(prune_pred == test_data$type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+### Random Forest
+```{r}
+library(caret)
+library(rsample)
+split <- initial_split(EEG, prop = (nrow(EEG) - 23) / nrow(EEG))
+train_data <- training(split)
+test_data <- testing(split)
+train_variable <- train_data[, -1]
+test_variable <- test_data[, -1]
+train_type <- train_data[, 1]
+test_type <- test_data[, 1]
+```
+
+```{r}
+library(randomForest)
+rf_EEG <- randomForest(x = train_variable, 
+                       y = train_type, 
+                       mtry = 3, 
+                       importance = TRUE) 
+print(rf_EEG)  
+
+pred <- predict(rf_EEG, test_variable, type = "class")
+accuracy <- mean(pred == test_type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+
+```{r}
+Random_Forest <- randomForest(train_type ~ . - PHQ.9,
+                              data = train_variable,
+                              mtry = 3,
+                              importance = TRUE) 
+print(Random_Forest)
+pred <- predict(Random_Forest, test_variable, type = "class")
+accuracy <- mean(pred == test_type)
+print(paste("Accracy:", round(accuracy * 100, 2), "%"))
+```
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
